@@ -1,0 +1,19 @@
+[package]
+name = "rust-calc"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2.92"
+web-sys = { version = "0.3.69", features = ['console'] }
+arrayvec = { version = "0.7.4", features = ["serde"] }
+strum = "0.26.2"
+strum_macros = "0.26.4"
+
+[profile.release]
+lto = true
