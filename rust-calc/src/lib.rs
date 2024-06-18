@@ -1,8 +1,7 @@
 pub mod data;
 
-use std::{fmt, hash, mem, str::FromStr, time::Instant};
+use std::{cmp::Ordering, fmt, hash, iter, mem, str::FromStr};
 
-use arrayvec::ArrayVec;
 use data::{Ability, Item, Move, Nature, Species, Type};
 use strum::{EnumCount, IntoEnumIterator};
 use strum_macros::{EnumCount, EnumIter, EnumString, FromRepr};
@@ -237,9 +236,9 @@ pub struct Pokemon {
     moves: [Move; 4],
     item: Item,
     nature: Nature,
-    abilities: ArrayVec<Ability, 2>,
+    abilities: [Option<Ability>; 2],
     evs: [u8; 6],
-    types: ArrayVec<Type, 2>,
+    types: [Option<Type>; 2],
 }
 
 impl fmt::Display for Pokemon {
@@ -356,25 +355,28 @@ fn is_valid_team(pokemon: [PokemonRef; 3], lookup_table: &LookupTable) -> bool {
 
 fn type_hint(pokemon: [PokemonRef; 3], lookup_table: &LookupTable) -> Type {
     let mut type_map: [u8; Type::COUNT] = [0; Type::COUNT];
-    for typ in pokemon.iter().flat_map(|p| {
+    for typ in pokemon.into_iter().flat_map(|p| {
         lookup_table[p.species as usize][p.id as usize - 1]
             .as_ref()
             .unwrap()
             .types
-            .iter()
+            .into_iter()
+            .flatten()
     }) {
-        type_map[*typ as usize] += 1;
+        type_map[typ as usize] += 1;
     }
 
     let mut highest_type_id = None;
     let mut highest_type_count = 0;
 
-    for (type_id, count) in type_map.iter().enumerate() {
-        if *count > highest_type_count {
-            highest_type_id = Some(type_id);
-            highest_type_count = *count;
-        } else if *count == highest_type_count {
-            highest_type_id = None;
+    for (type_id, count) in type_map.into_iter().enumerate() {
+        match count.cmp(&highest_type_count) {
+            Ordering::Greater => {
+                highest_type_id = Some(type_id);
+                highest_type_count = count;
+            }
+            Ordering::Equal => highest_type_id = None,
+            Ordering::Less => (),
         }
     }
 
@@ -456,13 +458,23 @@ fn parse_pokemon(input: &str) -> Vec<Pokemon> {
                 .unwrap();
             let abilities = sections[9]
                 .split('/')
-                .map(|s| Ability::from_str(s.trim()).expect(s))
-                .collect();
+                .map(|s| Some(Ability::from_str(s.trim()).expect(s)))
+                .chain(iter::once(None))
+                .take(2)
+                .collect::<Vec<_>>()
+                .try_into()
+                .unwrap();
 
             let types = sections[12]
                 .split_whitespace()
-                .map(|s| Type::from_str(s).unwrap_or_else(|v| panic!("Failed to parse type {}", v)))
-                .collect();
+                .map(|s| {
+                    Some(Type::from_str(s).unwrap_or_else(|v| panic!("Failed to parse type {}", v)))
+                })
+                .chain(iter::once(None))
+                .take(2)
+                .collect::<Vec<_>>()
+                .try_into()
+                .unwrap();
             Pokemon {
                 species,
                 id,

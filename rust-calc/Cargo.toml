@@ -11,7 +11,6 @@ crate-type = ["cdylib"]
 [dependencies]
 wasm-bindgen = "0.2.92"
 web-sys = { version = "0.3.69", features = ['console'] }
-arrayvec = { version = "0.7.4", features = ["serde"] }
 strum = "0.26.2"
 strum_macros = "0.26.4"
 
