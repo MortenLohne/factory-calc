@@ -9,9 +9,9 @@ function App() {
       <header className="App-header">
         <h1> Battle Factory Calculator</h1>
       </header>
-      <body className="App-body">
+      <div className="App-body">
       <Calculator/>
-      </body>
+      </div>
     </div>
   );
 }

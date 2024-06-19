@@ -75,14 +75,14 @@ const Calculator = () => {
           <option value="">Unknown type</option>
           <option value="Typeless">No type</option>
           {types.map(type =>
-              <option value={type}>{type}</option>
+              <option key={type} value={type}>{type}</option>
           )}
 
           </select>
         <select value={phrase} onChange={handlePhraseChange}>
           <option value="">Unknown phrase</option>
           {phrases.map(phrase =>
-              <option value={phrase}>{phrase}</option>
+              <option key={phrase} value={phrase}>{phrase}</option>
           )}
 
           </select>
