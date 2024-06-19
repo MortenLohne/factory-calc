@@ -1,0 +1,16 @@
+.table-container {
+    display: flex;
+    justify-content: space-between; /* This will add space between the tables */
+    padding: 10px; /* Optional: Add some padding */
+  }
+
+  .table {
+    border-collapse: collapse;
+    margin: 0 10px; /* Optional: Add margin to adjust spacing between tables */
+  }
+
+  .table th, .table td {
+    border: 1px solid black;
+    padding: 8px;
+    text-align: left;
+  }
