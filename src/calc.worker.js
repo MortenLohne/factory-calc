@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-globals */
 
-import init, { Data } from './pkg/rust_calc';
+import init, { Data } from 'rust-calc';
 
 init().then(() => {
     const startTime = performance.now()
