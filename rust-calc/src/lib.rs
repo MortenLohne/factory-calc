@@ -2,6 +2,7 @@ pub mod data;
 
 use std::{cmp::Ordering, fmt, hash, iter, mem, str::FromStr};
 
+use bincode::{Decode, Encode};
 use data::{Ability, Item, Move, Nature, Species, Type};
 use strum::{EnumCount, IntoEnumIterator};
 use strum_macros::{EnumCount, EnumIter, EnumString, FromRepr};
@@ -31,10 +32,16 @@ pub struct Data {
 
 #[wasm_bindgen]
 impl Data {
+    pub fn pokemon(&self) -> Vec<Pokemon> {
+        self.pokemon.clone()
+    }
     #[wasm_bindgen(constructor)]
     pub fn generate() -> Self {
-        let contents = include_str!("pokemon.csv");
-        let pokemon = parse_pokemon(contents);
+        let pokemon_bin = include_bytes!("pokemon.bin");
+        let pokemon: Vec<Pokemon> =
+            bincode::decode_from_slice(pokemon_bin, bincode::config::standard())
+                .unwrap()
+                .0;
 
         // Each Pokemon has max 10 variants in the factory
         let mut lookup_table: LookupTable = [const { [const { None }; 10] }; Species::COUNT];
@@ -123,7 +130,10 @@ impl Data {
         self.compute_mon_probs(typ, phrase, known_mons)
             .into_iter()
             .map(|(mon, p)| PokemonProbability {
-                pokemon: mon,
+                pokemon: self.lookup_table[mon.species as usize][mon.id as usize - 1]
+                    .as_ref()
+                    .unwrap()
+                    .into(),
                 probability: p,
             })
             .collect()
@@ -181,9 +191,10 @@ pub struct KnownPokemon {
     item: Option<Item>,
 }
 
-#[wasm_bindgen]
+#[wasm_bindgen(inspectable)]
 pub struct PokemonProbability {
-    pub pokemon: PokemonRef,
+    #[wasm_bindgen(getter_with_clone)]
+    pub pokemon: JSPokemon,
     pub probability: f32,
 }
 
@@ -201,6 +212,8 @@ pub struct PokemonProbability {
     PartialOrd,
     Ord,
     Hash,
+    Encode,
+    Decode,
 )]
 #[wasm_bindgen]
 pub enum Style {
@@ -227,8 +240,66 @@ impl TryFrom<u8> for Style {
     }
 }
 
-#[derive(Debug, Clone)]
-#[wasm_bindgen]
+#[derive(Clone)]
+#[wasm_bindgen(inspectable)]
+// A Pokemon representation intended to be exported to Javascript
+// It's separate from the `Pokemon` structs, because exporting enums through wasm is just too messy
+pub struct JSPokemon {
+    #[wasm_bindgen(getter_with_clone)]
+    pub species: String,
+    pub id: u8,
+    #[wasm_bindgen(getter_with_clone)]
+    pub styles: Vec<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub moves: Vec<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub item: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub nature: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub abilities: Vec<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub evs: Vec<u8>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub types: Vec<String>,
+}
+
+impl From<&Pokemon> for JSPokemon {
+    fn from(pokemon: &Pokemon) -> Self {
+        JSPokemon {
+            species: pokemon.species.to_string(),
+            id: pokemon.id,
+            styles: pokemon
+                .styles
+                .into_iter()
+                .map(|style| style.to_string())
+                .collect::<Vec<_>>(),
+            moves: pokemon
+                .moves
+                .into_iter()
+                .map(|mv| mv.to_string())
+                .collect::<Vec<_>>(),
+            item: pokemon.item.to_string(),
+            nature: pokemon.item.to_string(),
+            abilities: pokemon
+                .abilities
+                .into_iter()
+                .flatten()
+                .map(|ability| ability.to_string())
+                .collect(),
+            evs: pokemon.evs.to_vec(),
+            types: pokemon
+                .types
+                .into_iter()
+                .flatten()
+                .map(|typ| typ.to_string())
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Encode, Decode)]
+#[wasm_bindgen(inspectable)]
 pub struct Pokemon {
     species: Species,
     id: u8,
@@ -277,9 +348,11 @@ impl PartialEq for Pokemon {
 impl Eq for Pokemon {}
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash)]
-#[wasm_bindgen]
+#[wasm_bindgen(inspectable)]
 pub struct PokemonRef {
+    #[wasm_bindgen]
     pub species: Species,
+    #[wasm_bindgen]
     pub id: u8,
 }
 
@@ -424,7 +497,7 @@ fn phrase(pokemon: [PokemonRef; 3], lookup_table: &LookupTable) -> Style {
     }
 }
 
-fn parse_pokemon(input: &str) -> Vec<Pokemon> {
+pub fn parse_pokemon_from_csv(input: &str) -> Vec<Pokemon> {
     input
         .lines()
         .filter(|line| !line.trim().is_empty())

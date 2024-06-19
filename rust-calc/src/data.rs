@@ -1,9 +1,23 @@
+use bincode::{Decode, Encode};
 use strum_macros::EnumIter;
 use strum_macros::{Display, EnumCount};
 use strum_macros::{EnumString, FromRepr};
 use wasm_bindgen::prelude::*;
 
-#[derive(Debug, Display, EnumIter, EnumString, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug,
+    Display,
+    EnumIter,
+    EnumString,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Encode,
+    Decode,
+)]
 #[wasm_bindgen]
 pub enum Ability {
     Torrent,
@@ -92,7 +106,20 @@ pub enum Ability {
     RockHead,
 }
 
-#[derive(Debug, Display, EnumIter, EnumString, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug,
+    Display,
+    EnumIter,
+    EnumString,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Encode,
+    Decode,
+)]
 #[wasm_bindgen]
 pub enum Item {
     BrightPowder,
@@ -149,7 +176,20 @@ pub enum Item {
     WhiteHerb,
 }
 
-#[derive(Debug, Display, EnumIter, EnumString, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug,
+    Display,
+    EnumIter,
+    EnumString,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Encode,
+    Decode,
+)]
 #[wasm_bindgen]
 pub enum Move {
     #[strum(serialize = "Acid Armor")]
@@ -429,7 +469,20 @@ pub enum Move {
     ZapCannon,
 }
 
-#[derive(Debug, Display, EnumIter, EnumString, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug,
+    Display,
+    EnumIter,
+    EnumString,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Encode,
+    Decode,
+)]
 #[wasm_bindgen]
 pub enum Nature {
     Adamant,
@@ -451,7 +504,22 @@ pub enum Nature {
     Timid,
 }
 
-#[derive(Debug, Display, EnumCount, EnumIter, EnumString, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Debug,
+    Display,
+    EnumCount,
+    EnumIter,
+    EnumString,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Encode,
+    Decode,
+)]
 #[wasm_bindgen]
 pub enum Species {
     Aerodactyl,
@@ -567,7 +635,21 @@ pub enum Species {
 }
 
 #[derive(
-    Debug, Display, EnumIter, EnumString, EnumCount, FromRepr, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash,
+    Debug,
+    Display,
+    EnumIter,
+    EnumString,
+    EnumCount,
+    FromRepr,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Encode,
+    Decode,
 )]
 #[wasm_bindgen]
 pub enum Type {

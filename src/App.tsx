@@ -27,10 +27,6 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <button onClick={handleGreet}>Greet</button>
-
-        <p> Hello world!</p>
-        <p>{greeting}</p>
         <Calculator />
       </header>
     </div>
