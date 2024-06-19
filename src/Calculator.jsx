@@ -70,22 +70,23 @@ const Calculator = () => {
 
   return (
     <div>
-      <h1> Calculator</h1>
-      <select value={type} onChange={handleTypeChange}>
-        <option value="">Unknown type</option>
-        <option value="Typeless">No type</option>
-        {types.map(type => 
-            <option value={type}>{type}</option>
-        )}
-        
-        </select>
-      <select value={phrase} onChange={handlePhraseChange}>
-        <option value="">Unknown phrase</option>
-        {phrases.map(phrase => 
-            <option value={phrase}>{phrase}</option>
-        )}
-        
-        </select>
+      <div className="type-phrase-selection">
+        <select value={type} onChange={handleTypeChange}>
+          <option value="">Unknown type</option>
+          <option value="Typeless">No type</option>
+          {types.map(type =>
+              <option value={type}>{type}</option>
+          )}
+
+          </select>
+        <select value={phrase} onChange={handlePhraseChange}>
+          <option value="">Unknown phrase</option>
+          {phrases.map(phrase =>
+              <option value={phrase}>{phrase}</option>
+          )}
+
+          </select>
+      </div>
       {result === null ? <p>Loading Pokemon data...</p> : result.length === 0 ? <p>No matching Pokemon found!</p> : 
       <div className="table-container">
       <table className="table">

@@ -8,7 +8,7 @@ init().then(() => {
     const endTime = performance.now()
     console.log(`Loaded pokemon data in ${endTime - startTime} milliseconds`)
 
-    const defaultResult = data.compute("Typeless", "FreeSpirited", []);
+    const defaultResult = data.compute("", "", []);
     postMessage(JSON.stringify(defaultResult))
 
     self.onmessage = function(e) {

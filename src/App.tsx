@@ -1,25 +1,17 @@
 import React, { useState } from 'react';
-import logo from './logo.svg';
 import './App.css';
 // import FibonacciCalculator from './FibonacciCalculator.js';
-import Calculator from './Calculator.js';
+import Calculator from './Calculator.jsx';
 
 function App() {
-  const [greeting, setGreeting] = useState('');
-  const [pokemonList, setPokemonList] = useState({});
-
-
-  const handleGreet = () => {
-
-    setGreeting('React-Rust Developer');
-
-  };
-
   return (
     <div className="App">
       <header className="App-header">
-        <Calculator />
+        <h1> Battle Factory Calculator</h1>
       </header>
+      <body className="App-body">
+      <Calculator/>
+      </body>
     </div>
   );
 }
