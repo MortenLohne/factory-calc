@@ -93,12 +93,13 @@ const Calculator = () => {
           )}
         </select>
       </div>
-      <h3> Excluded pokémon: </h3>
+      <h2 style={{ marginBottom: 0, marginTop: 30 }}> Excluded pokémon: </h2>
+      <span style={{ fontSize: 12 }}> (Our team, the last opponent's team, or Pokémon rejected from the draft) </span>
       <div className="excluded-species">
         <ExcludedSpeciesSelector setExcludedSpecies={setExcludedSpecies} />
 
       </div>
-      <h3> Opponent's pokémon: </h3>
+      <h2 style={{ marginBottom: 0, marginTop: 50 }}> Opponent's pokémon: </h2>
       <div>
         <OpponentSelector setIncludedSpecies={setIncludedSpecies} />
       </div>
