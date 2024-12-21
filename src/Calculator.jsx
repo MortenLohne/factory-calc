@@ -62,7 +62,7 @@ const Calculator = () => {
 
   let resultPerSpecies = Object.entries(probabilityPerSpecies);
   resultPerSpecies.sort(([_, p1], [__, p2]) => p2 - p1);
-  resultPerSpecies = resultPerSpecies.filter(([_, probability], i) => probability > 0.01 || i < 20);
+  resultPerSpecies = resultPerSpecies.filter(([_, probability], i) => probability > 0.0 && (probability > 0.01 || i < 20));
 
   return (
     <div>
@@ -124,7 +124,7 @@ const Calculator = () => {
             </thead>
             <tbody>
               {result
-                .filter(({ probability }, i) => probability > 0.01 || i < 20)
+                .filter(({ probability }, i) => probability > 0.0 && (probability > 0.01 || i < 20))
                 .map(res =>
                   <tr key={res.pokemon.species + "-" + res.pokemon.id}>
                     <th scope="row">{res.pokemon.species + "-" + res.pokemon.id}</th>
