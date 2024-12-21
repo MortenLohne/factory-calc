@@ -139,7 +139,14 @@ impl Data {
         self.compute_mon_probs(
             typ,
             phrase,
-            vec![],
+            known_species
+                .into_iter()
+                .map(|s| KnownPokemon {
+                    species: Species::from_str(&s).unwrap(),
+                    moves: vec![],
+                    item: None,
+                })
+                .collect(),
             excluded_species
                 .into_iter()
                 .map(|s| Species::from_str(&s).unwrap())

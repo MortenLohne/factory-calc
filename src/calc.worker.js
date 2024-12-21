@@ -13,8 +13,8 @@ init().then(() => {
 
     self.onmessage = function (e) {
         const payload = JSON.parse(e.data)
-        // console.log(`Computing with "${payload.type}", "${payload.phrase}" and "${payload.excludedSpecies}" from "${payload}`)
-        const probabilities = data.compute(payload.type, payload.phrase, [], payload.excludedSpecies);
+        // console.log(`Computing with "${payload.type}", "${payload.phrase}" included species ${payload.includedSpecies} and excluded species "${payload.excludedSpecies}" from "${payload}`)
+        const probabilities = data.compute(payload.type, payload.phrase, payload.includedSpecies, payload.excludedSpecies);
         postMessage(JSON.stringify(
             probabilities))
     };

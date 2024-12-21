@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import './Calculator.css'; // Assuming you have a CSS file for styles
 import Worker from './calc.worker.js';
 import ExcludedSpeciesSelector from './ExcludedSpeciesSelector';
+import OpponentSelector from './OpponentSelector';
 
 const types = [
   'Bug', 'Dark',
@@ -32,6 +33,7 @@ const phrases = [
 const Calculator = () => {
   const [type, setType] = useState("Typeless");
   const [phrase, setPhrase] = useState("FreeSpirited");
+  const [includedSpecies, setIncludedSpecies] = useState([]); // Species on the opponent's team
   const [excludedSpecies, setExcludedSpecies] = useState([]); // Species on our team or in last round's pool
   const [result, setResult] = useState(null);
   const [worker] = useState(() => new Worker());
@@ -45,8 +47,8 @@ const Calculator = () => {
   };
 
   useEffect(() => {
-    worker.postMessage(JSON.stringify({ type: type, phrase: phrase, excludedSpecies: excludedSpecies }));
-  }, [type, phrase, excludedSpecies, worker]);
+    worker.postMessage(JSON.stringify({ type: type, phrase: phrase, includedSpecies, excludedSpecies: excludedSpecies }));
+  }, [type, phrase, includedSpecies, excludedSpecies, worker]);
 
   worker.onmessage = (e) => {
     setResult(JSON.parse(e.data));
@@ -83,6 +85,10 @@ const Calculator = () => {
       <div className="excluded-species">
         <ExcludedSpeciesSelector setExcludedSpecies={setExcludedSpecies} />
 
+      </div>
+      <h3> Opponent's pokémon: </h3>
+      <div>
+        <OpponentSelector setIncludedSpecies={setIncludedSpecies} />
       </div>
       {result === null ? <p>Loading Pokemon data...</p> : result.length === 0 ? <p>No matching Pokemon found!</p> :
         <div className="table-container">

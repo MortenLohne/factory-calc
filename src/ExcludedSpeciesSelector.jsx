@@ -117,11 +117,9 @@ const ExcludedSpeciesSelector = ({ setExcludedSpecies }) => {
     const [excludedLocal, setExcludedLocal] = React.useState([null, null, null, null, null, null]);
 
     const handleSpeciesChange = (index, e) => {
-        console.log("Excluding index " + index + ": " + e.target.value);
         let clonedLocal = [...excludedLocal];
         clonedLocal[index] = e.target.value;
         setExcludedLocal(clonedLocal);
-        console.log("Now excluded local: " + clonedLocal);
 
         setExcludedSpecies(clonedLocal.filter((species) => species));
     };
@@ -133,7 +131,6 @@ const ExcludedSpeciesSelector = ({ setExcludedSpecies }) => {
                     key={index}
                     value={excludedLocal[index] || ""}
                     onChange={(e) => handleSpeciesChange(index, e)}
-                    onMouseDown={(e) => handleSpeciesChange(index, e)}
                 >
                     <option value="">Select species</option>
                     {speciesList.map((species) => (
