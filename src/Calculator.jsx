@@ -29,6 +29,18 @@ const phrases = [
   "Adaptable",
 ]
 
+const phraseLabels = {
+  "FreeSpirited": "Free-spirited and unrestrained",
+  "Preparation": "Total preparation",
+  "SlowAndSteady": "Slow and steady",
+  "Endurance": "One of endurance",
+  "HighRiskHighReturn": "High risk, high return",
+  "Weakening": "Weakening the foe",
+  "Unpredictable": "Impossible to predict",
+  "BattleFlow": "Depends on the battle's flow",
+  "Adaptable": "Flexibly adaptable",
+}
+
 
 const Calculator = () => {
   const [type, setType] = useState("Typeless");
@@ -77,7 +89,7 @@ const Calculator = () => {
         <select value={phrase} onChange={handlePhraseChange} style={{ fontSize: '1.3em' }}>
           <option value="">Unknown phrase</option>
           {phrases.map(phrase =>
-            <option key={phrase} value={phrase}>{phrase}</option>
+            <option key={phrase} value={phrase}>{phraseLabels[phrase]}</option>
           )}
         </select>
       </div>
