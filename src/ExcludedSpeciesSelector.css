@@ -1,0 +1,4 @@
+.excluded-species-selector {
+    display: flex;
+    justify-content: space-evenly;
+}

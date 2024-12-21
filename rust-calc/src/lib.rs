@@ -11,7 +11,7 @@ type LookupTable = PokemonTable<Option<Pokemon>>;
 
 type PokemonTable<T> = [[T; 10]; Species::COUNT];
 
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::{convert::TryFromJsValue, prelude::*};
 
 #[wasm_bindgen]
 extern "C" {
@@ -57,17 +57,23 @@ impl Data {
         }
     }
 
+    /// Returns the number of teams that match the given criteria,
+    /// and a table of the number of times each moveset of each species appears in those teams
     pub(crate) fn compute_prob_table(
         &self,
         typ: Option<Type>,
         phrase: Option<Style>,
         known_mons: Vec<KnownPokemon>,
+        excluded_species: Vec<Species>,
     ) -> (u32, PokemonTable<u32>) {
         let mut result: PokemonTable<u32> = [[0; 10]; Species::COUNT];
         let mut matching_teams = 0;
         for team in self.all_teams.iter() {
             if (typ.is_none() || typ == Some(team.typ))
                 && (phrase.is_none() || phrase == Some(team.phrase))
+                && excluded_species
+                    .iter()
+                    .all(|species| team.pokemon.iter().all(|r| r.species != *species))
                 && known_mons.iter().all(
                     |KnownPokemon {
                          species,
@@ -99,8 +105,10 @@ impl Data {
         typ: Option<Type>,
         phrase: Option<Style>,
         known_mons: Vec<KnownPokemon>,
+        excluded_species: Vec<Species>,
     ) -> Vec<(PokemonRef, f32)> {
-        let (matching_teams, probs) = self.compute_prob_table(typ, phrase, known_mons);
+        let (matching_teams, probs) =
+            self.compute_prob_table(typ, phrase, known_mons, excluded_species);
         if matching_teams == 0 {
             return vec![];
         }
@@ -123,20 +131,29 @@ impl Data {
         &self,
         typ: Option<String>,
         phrase: Option<String>,
-        known_mons: Vec<KnownPokemon>,
+        known_species: Vec<String>,
+        excluded_species: Vec<String>,
     ) -> Vec<PokemonProbability> {
         let typ = typ.and_then(|s| Type::from_str(&s).ok());
         let phrase = phrase.and_then(|s| Style::from_str(&s).ok());
-        self.compute_mon_probs(typ, phrase, known_mons)
-            .into_iter()
-            .map(|(mon, p)| PokemonProbability {
-                pokemon: self.lookup_table[mon.species as usize][mon.id as usize - 1]
-                    .as_ref()
-                    .unwrap()
-                    .into(),
-                probability: p,
-            })
-            .collect()
+        self.compute_mon_probs(
+            typ,
+            phrase,
+            vec![],
+            excluded_species
+                .into_iter()
+                .map(|s| Species::from_str(&s).unwrap())
+                .collect(),
+        )
+        .into_iter()
+        .map(|(mon, p)| PokemonProbability {
+            pokemon: self.lookup_table[mon.species as usize][mon.id as usize - 1]
+                .as_ref()
+                .unwrap()
+                .into(),
+            probability: p,
+        })
+        .collect()
     }
 }
 
@@ -186,9 +203,10 @@ fn unique_teams(lookup_table: &LookupTable) -> Vec<Team> {
 
 #[wasm_bindgen]
 pub struct KnownPokemon {
-    species: Species,
-    moves: Vec<Move>,
-    item: Option<Item>,
+    pub species: Species,
+    #[wasm_bindgen(getter_with_clone)]
+    pub moves: Vec<Move>,
+    pub item: Option<Item>,
 }
 
 #[wasm_bindgen(inspectable)]

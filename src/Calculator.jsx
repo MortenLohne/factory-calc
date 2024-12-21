@@ -2,25 +2,18 @@
 import React, { useState, useEffect } from 'react';
 import './Calculator.css'; // Assuming you have a CSS file for styles
 import Worker from './calc.worker.js';
+import ExcludedSpeciesSelector from './ExcludedSpeciesSelector';
 
 const types = [
-  "Normal",
-  "Fire",
-  "Water",
-  "Electric",
-  "Grass",
-  "Ice",
-  "Fighting",
-  "Poison",
-  "Ground",
-  "Flying",
-  "Psychic",
-  "Bug",
-  "Rock",
-  "Ghost",
-  "Dragon",
-  "Dark",
-  "Steel"
+  'Bug', 'Dark',
+  'Dragon', 'Electric',
+  'Fighting', 'Fire',
+  'Flying', 'Ghost',
+  'Grass', 'Ground',
+  'Ice', 'Normal',
+  'Poison', 'Psychic',
+  'Rock', 'Steel',
+  'Water'
 ];
 
 const phrases = [
@@ -37,8 +30,8 @@ const phrases = [
 
 
 const Calculator = () => {
-  const [type, setType] = useState("");
-  const [phrase, setPhrase] = useState("");
+  const [type, setType] = useState("Typeless");
+  const [phrase, setPhrase] = useState("FreeSpirited");
   const [excludedSpecies, setExcludedSpecies] = useState([]); // Species on our team or in last round's pool
   const [result, setResult] = useState(null);
   const [worker] = useState(() => new Worker());
@@ -52,8 +45,8 @@ const Calculator = () => {
   };
 
   useEffect(() => {
-    worker.postMessage(JSON.stringify({ type: type, phrase: phrase }));
-  }, [type, phrase, worker]);
+    worker.postMessage(JSON.stringify({ type: type, phrase: phrase, excludedSpecies: excludedSpecies }));
+  }, [type, phrase, excludedSpecies, worker]);
 
   worker.onmessage = (e) => {
     setResult(JSON.parse(e.data));
@@ -72,27 +65,50 @@ const Calculator = () => {
   return (
     <div>
       <div className="type-phrase-selection">
-        <select value={type} onChange={handleTypeChange}>
+        <select value={type} onChange={handleTypeChange} style={{ fontSize: '1.3em' }}>
           <option value="">Unknown type</option>
           <option value="Typeless">No type</option>
           {types.map(type =>
             <option key={type} value={type}>{type}</option>
           )}
-
         </select>
-        <select value={phrase} onChange={handlePhraseChange}>
+        <select value={phrase} onChange={handlePhraseChange} style={{ fontSize: '1.3em' }}>
           <option value="">Unknown phrase</option>
           {phrases.map(phrase =>
             <option key={phrase} value={phrase}>{phrase}</option>
           )}
-
         </select>
+      </div>
+      <h3> Excluded pokémon: </h3>
+      <div className="excluded-species">
+        <ExcludedSpeciesSelector setExcludedSpecies={setExcludedSpecies} />
+
       </div>
       {result === null ? <p>Loading Pokemon data...</p> : result.length === 0 ? <p>No matching Pokemon found!</p> :
         <div className="table-container">
           <table className="table">
             <caption>
               Result
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Species</th>
+                <th scope="col">Probability</th>
+              </tr>
+            </thead>
+            <tbody>
+              {resultPerSpecies
+                .map(([species, probability]) =>
+                  <tr key={species}>
+                    <th scope="row">{species}</th>
+                    <td>{(probability * 100).toFixed(2) + "%"}</td>
+                  </tr>
+                )}
+            </tbody>
+          </table>
+          <table className="table">
+            <caption>
+              Result per moveset
             </caption>
             <thead>
               <tr>
@@ -108,28 +124,6 @@ const Calculator = () => {
                     <th scope="row">{res.pokemon.species + "-" + res.pokemon.id}</th>
                     <td>{(res.probability * 100).toFixed(2) + "%"}</td>
                   </tr>
-
-                )}
-            </tbody>
-          </table>
-          <table className="table">
-            <caption>
-              Result per species
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">Species</th>
-                <th scope="col">Probability</th>
-              </tr>
-            </thead>
-            <tbody>
-              {resultPerSpecies
-                .map(([species, probability]) =>
-                  <tr key={species}>
-                    <th scope="row">{species}</th>
-                    <td>{(probability * 100).toFixed(2) + "%"}</td>
-                  </tr>
-
                 )}
             </tbody>
           </table>
