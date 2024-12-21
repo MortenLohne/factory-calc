@@ -139,21 +139,18 @@ const OpponentSelector = ({ setIncludedSpecies }) => {
             {opponents.map((opponent, index) => (
                 <div key={index}>
                     <h4>Opponent {index + 1}</h4>
-                    <label>
-                        Species:
-                        <select
-                            key={index}
-                            value={opponents[index].species || ""}
-                            onChange={(e) => handleSpeciesChange(index, e)}
-                        >
-                            <option value="">Select species</option>
-                            {speciesList.map((species) => (
-                                <option key={species} value={species}>
-                                    {species}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
+                    <select
+                        key={index}
+                        value={opponents[index].species || ""}
+                        onChange={(e) => handleSpeciesChange(index, e)}
+                    >
+                        <option value="">Select species</option>
+                        {speciesList.map((species) => (
+                            <option key={species} value={species}>
+                                {species}
+                            </option>
+                        ))}
+                    </select>
                     {/* <div>
                         <label>
                             Moveset:
