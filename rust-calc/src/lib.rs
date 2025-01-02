@@ -27,7 +27,7 @@ pub fn greet(name: &str) {
 pub struct Data {
     pub(crate) pokemon: Vec<Pokemon>,
     pub(crate) lookup_table: LookupTable,
-    pub(crate) all_teams: Vec<Team>,
+    pub(crate) all_teams: [[Vec<Team>; Style::COUNT]; Type::COUNT], // All possible teams, split into buckets by type and phrase
 }
 
 #[wasm_bindgen]
@@ -49,7 +49,7 @@ impl Data {
             lookup_table[mon.species as usize][mon.id as usize - 1] = Some(mon.clone());
         }
 
-        let unique_teams: Vec<Team> = unique_teams(&lookup_table);
+        let unique_teams: [[Vec<Team>; Style::COUNT]; Type::COUNT] = unique_teams(&lookup_table);
         Self {
             pokemon,
             lookup_table,
@@ -68,32 +68,41 @@ impl Data {
     ) -> (u32, PokemonTable<u32>) {
         let mut result: PokemonTable<u32> = [[0; 10]; Species::COUNT];
         let mut matching_teams = 0;
-        for team in self.all_teams.iter() {
-            if (typ.is_none() || typ == Some(team.typ))
-                && (phrase.is_none() || phrase == Some(team.phrase))
-                && excluded_species
-                    .iter()
-                    .all(|species| team.pokemon.iter().all(|r| r.species != *species))
-                && known_mons.iter().all(
-                    |KnownPokemon {
-                         species,
-                         moves,
-                         item,
-                     }| {
-                        team.pokemon.iter().any(|r| {
-                            let team_mon = self.lookup_table[r.species as usize][r.id as usize - 1]
-                                .as_ref()
-                                .unwrap();
-                            (item.is_none() || Some(team_mon.item) == *item)
-                                && team_mon.species == *species
-                                && moves.iter().all(|mv| team_mon.moves.contains(mv))
-                        })
-                    },
-                )
-            {
-                matching_teams += 1;
-                for pokemon in team.pokemon.iter() {
-                    result[pokemon.species as usize][pokemon.id as usize - 1] += 1;
+        for (i, teamss) in self.all_teams.iter().enumerate() {
+            if typ.is_some_and(|t| t as usize != i) {
+                continue;
+            }
+            for (j, teams) in teamss.into_iter().enumerate() {
+                if phrase.is_some_and(|p| p as usize != j) {
+                    continue;
+                }
+                for team in teams.into_iter() {
+                    if excluded_species
+                        .iter()
+                        .all(|species| team.pokemon.iter().all(|r| r.species != *species))
+                        && known_mons.iter().all(
+                            |KnownPokemon {
+                                 species,
+                                 moves,
+                                 item,
+                             }| {
+                                team.pokemon.iter().any(|r| {
+                                    let team_mon = self.lookup_table[r.species as usize]
+                                        [r.id as usize - 1]
+                                        .as_ref()
+                                        .unwrap();
+                                    (item.is_none() || Some(team_mon.item) == *item)
+                                        && team_mon.species == *species
+                                        && moves.iter().all(|mv| team_mon.moves.contains(mv))
+                                })
+                            },
+                        )
+                    {
+                        matching_teams += 1;
+                        for pokemon in team.pokemon.iter() {
+                            result[pokemon.species as usize][pokemon.id as usize - 1] += 1;
+                        }
+                    }
                 }
             }
         }
@@ -182,8 +191,8 @@ pub fn compute_species_probs(mon_probs: &[(PokemonRef, f32)]) -> Vec<(Species, f
     species_prob
 }
 
-fn unique_teams(lookup_table: &LookupTable) -> Vec<Team> {
-    let mut unique_teams = Vec::new();
+fn unique_teams(lookup_table: &LookupTable) -> [[Vec<Team>; Style::COUNT]; Type::COUNT] {
+    let mut unique_teams = [const { [const { Vec::new() }; Style::COUNT] }; Type::COUNT];
 
     for (i, mon1) in lookup_table
         .iter()
@@ -200,7 +209,8 @@ fn unique_teams(lookup_table: &LookupTable) -> Vec<Team> {
                 let mons = [mon1.into(), mon2.into(), mon3.into()];
 
                 if is_valid_team(mons, lookup_table) {
-                    unique_teams.push(Team::new(mons, lookup_table));
+                    let team = Team::new(mons, lookup_table);
+                    unique_teams[team.typ as usize][team.phrase as usize].push(team);
                 }
             }
         }
