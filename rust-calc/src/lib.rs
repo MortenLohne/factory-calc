@@ -23,6 +23,70 @@ pub fn greet(name: &str) {
     alert(&format!("Hello, {}!", name));
 }
 
+pub struct SmallData {
+    pub pokemon: Vec<Pokemon>,
+    pub lookup_table: LookupTable,
+}
+
+impl SmallData {
+    pub fn new() -> Self {
+        let pokemon_bin = include_bytes!("pokemon.bin");
+        let pokemon: Vec<Pokemon> =
+            bincode::decode_from_slice(pokemon_bin, bincode::config::standard())
+                .unwrap()
+                .0;
+
+        // Each Pokemon has max 10 variants in the factory
+        let lookup_table: LookupTable = create_lookup_table(&pokemon);
+
+        Self {
+            pokemon,
+            lookup_table,
+        }
+    }
+}
+
+#[wasm_bindgen]
+pub struct LargeData {
+    pub(crate) pokemon: Vec<Pokemon>,
+    pub(crate) lookup_table: LookupTable,
+    pub(crate) all_teams: [[Vec<Team>; Style::COUNT]; Type::COUNT], // All possible teams, split into buckets by type and phrase
+}
+
+#[wasm_bindgen]
+impl LargeData {
+    pub fn pokemon(&self) -> Vec<Pokemon> {
+        self.pokemon.clone()
+    }
+
+    #[wasm_bindgen(constructor)]
+    pub fn generate() -> Self {
+        let pokemon_bin = include_bytes!("pokemon.bin");
+        let pokemon: Vec<Pokemon> =
+            bincode::decode_from_slice(pokemon_bin, bincode::config::standard())
+                .unwrap()
+                .0;
+
+        // Each Pokemon has max 10 variants in the factory
+        let lookup_table: LookupTable = create_lookup_table(&pokemon);
+
+        let unique_teams: [[Vec<Team>; Style::COUNT]; Type::COUNT] = unique_teams(&lookup_table);
+        Self {
+            pokemon,
+            lookup_table,
+            all_teams: unique_teams,
+        }
+    }
+}
+
+pub fn create_lookup_table(all_pokemon: &[Pokemon]) -> LookupTable {
+    let mut lookup_table: LookupTable = [const { [const { None }; 10] }; Species::COUNT];
+    for mon in all_pokemon {
+        lookup_table[mon.species as usize][mon.id as usize - 1] = Some(mon.clone());
+    }
+    lookup_table
+}
+
 #[wasm_bindgen]
 pub struct Data {
     pub(crate) pokemon: Vec<Pokemon>,
@@ -44,10 +108,7 @@ impl Data {
                 .0;
 
         // Each Pokemon has max 10 variants in the factory
-        let mut lookup_table: LookupTable = [const { [const { None }; 10] }; Species::COUNT];
-        for mon in pokemon.iter() {
-            lookup_table[mon.species as usize][mon.id as usize - 1] = Some(mon.clone());
-        }
+        let lookup_table: LookupTable = create_lookup_table(&pokemon);
 
         let unique_teams: [[Vec<Team>; Style::COUNT]; Type::COUNT] = unique_teams(&lookup_table);
         Self {
@@ -218,6 +279,61 @@ fn unique_teams(lookup_table: &LookupTable) -> [[Vec<Team>; Style::COUNT]; Type:
     unique_teams
 }
 
+pub fn calculate_team_odds(
+    all_pokemon: &[Pokemon],
+    lookup_table: &LookupTable,
+) -> Vec<(Team, f64)> {
+    let mut output: Vec<(Team, f64)> = Vec::new();
+    let num_possibilities = all_pokemon.len();
+    for mon in all_pokemon {
+        let all_possible_mons2 = all_pokemon
+            .iter()
+            .filter(|other_mon| other_mon.species != mon.species && other_mon.item != mon.item)
+            .cloned()
+            .collect::<Vec<_>>();
+        let num_possibilities2 = all_possible_mons2.len();
+        for mon2 in all_possible_mons2.iter() {
+            let all_possible_mons3 = all_possible_mons2
+                .iter()
+                .filter(|other_mon| {
+                    other_mon.species != mon2.species && other_mon.item != mon2.item
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            let num_possibilities3 = all_possible_mons3.len();
+            for mon3 in all_possible_mons3.iter() {
+                let team = Team::new([mon.into(), mon2.into(), mon3.into()], lookup_table);
+                assert!(is_valid_team(team.pokemon, lookup_table));
+                output.push((
+                    team,
+                    1.0 / (num_possibilities * num_possibilities2 * num_possibilities3) as f64,
+                ));
+            }
+        }
+    }
+    output
+}
+
+fn unique_teams_all_permutations(
+    lookup_table: &LookupTable,
+) -> [[Vec<Team>; Style::COUNT]; Type::COUNT] {
+    let mut unique_teams = [const { [const { Vec::new() }; Style::COUNT] }; Type::COUNT];
+
+    for mon1 in lookup_table.iter().flatten().flatten() {
+        for mon2 in lookup_table.iter().flatten().flatten() {
+            for mon3 in lookup_table.iter().flatten().flatten() {
+                let mons = [mon1.into(), mon2.into(), mon3.into()];
+
+                if is_valid_team(mons, lookup_table) {
+                    let team = Team::new(mons, lookup_table);
+                    unique_teams[team.typ as usize][team.phrase as usize].push(team);
+                }
+            }
+        }
+    }
+    unique_teams
+}
+
 #[wasm_bindgen]
 pub struct KnownPokemon {
     pub species: Species,
@@ -336,11 +452,11 @@ impl From<&Pokemon> for JSPokemon {
 #[derive(Debug, Clone, Encode, Decode)]
 #[wasm_bindgen(inspectable)]
 pub struct Pokemon {
-    species: Species,
-    id: u8,
+    pub species: Species,
+    pub id: u8,
     styles: [Style; 4],
     moves: [Move; 4],
-    item: Item,
+    pub item: Item,
     nature: Nature,
     abilities: [Option<Ability>; 2],
     evs: [u8; 6],
@@ -414,9 +530,8 @@ impl fmt::Display for PokemonRef {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord, Hash)]
-#[wasm_bindgen]
 pub struct Team {
-    pokemon: [PokemonRef; 3],
+    pub pokemon: [PokemonRef; 3],
     phrase: Style,
     typ: Type,
 }
