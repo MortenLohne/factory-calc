@@ -1,9 +1,9 @@
 use bincode::{self};
-use rust_calc::{
-    calculate_team_odds,
-    data::{Item, Species},
-    parse_pokemon_from_csv, Data, Pokemon, PokemonRef, SmallData, Team,
-};
+// use rust_calc::{
+//     calculate_team_odds,
+//     data::{Item, Species},
+//     parse_pokemon_from_csv, Data, Pokemon, PokemonRef, SmallData, Team,
+// };
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     io::stdout,
@@ -43,7 +43,7 @@ fn main() {
     //     );
     // }
 
-    let mut team_odds = calculate_team_odds(&all_pokemon, &lookup_table);
+    let mut team_odds = calculate_team_odds(&all_pokemon, &lookup_table, &[]);
 
     // Check that all teams are unique
     // assert_eq!(
@@ -53,7 +53,7 @@ fn main() {
     println!("Got {} unique teams", team_odds.len());
 
     println!(
-        "Generated odds for {} teams, sums to {:.6}%, took {:.1}s",
+        "Generated odds for {} teams, sums to {:.8}%, took {:.1}s",
         team_odds.len(),
         team_odds.iter().map(|(_, odds)| odds).sum::<f64>() * 100.0,
         start_time.elapsed().as_secs_f32()
@@ -114,18 +114,24 @@ fn main() {
 
     let p_for_sets_sum = p_for_sets_vec.iter().map(|(_, p)| p).sum::<f64>();
 
-    println!("Total probability: {:.6}%", p_for_sets_sum * 100.0);
+    println!("Total probability: {:.8}%", p_for_sets_sum * 100.0);
 
     println!("Most likely to appear anywhere in a team:");
     for (mon, p) in p_for_sets_vec.iter().take(30) {
         println!(
-            "{:15}: {:.5}%, appears in {} teams",
+            "{:15}: {:.5}%, appears in {} teams, {:.6}% of all teams",
             mon.to_string(),
             p * 100.0,
             team_odds
                 .iter()
                 .filter(|(team, _)| team.pokemon.contains(mon))
-                .count()
+                .count(),
+            team_odds
+                .iter()
+                .filter(|(team, _)| team.pokemon.contains(mon))
+                .count() as f32
+                / team_odds.len() as f32
+                * 100.0
         )
     }
 
@@ -176,13 +182,29 @@ fn main() {
         .take(50)
     {
         println!(
-            "{:15}: {:.6}%, appears in {} teams",
+            "{:15}: {:.6}%, appears in {} teams, {:.6}% of all teams, {:.6}% first slot, {:.6}% second slot",
             mon.to_string(),
             p * 100.0,
             team_odds
                 .iter()
                 .filter(|(team, _)| team.pokemon.contains(mon))
-                .count()
+                .count(),
+            team_odds
+                .iter()
+                .filter(|(team, _)| team.pokemon.contains(mon))
+                .count() as f32
+                / team_odds.len() as f32
+                * 100.0,
+            team_odds
+                .iter()
+                .filter(|(team, _)| team.pokemon[0] == *mon)
+                .map(|(_, p)| p)
+                .sum::<f64>() * 100.0,
+            team_odds
+                .iter()
+                .filter(|(team, _)| team.pokemon[1] == *mon)
+                .map(|(_, p)| p)
+                .sum::<f64>() * 100.0,
         )
     }
 

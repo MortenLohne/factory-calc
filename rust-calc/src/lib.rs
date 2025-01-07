@@ -13,6 +13,12 @@ type PokemonTable<T> = [[T; 10]; Species::COUNT];
 
 use wasm_bindgen::{convert::TryFromJsValue, prelude::*};
 
+use console_error_panic_hook;
+use std::panic;
+use web_sys::console;
+
+fn my_init_function() {}
+
 #[wasm_bindgen]
 extern "C" {
     fn alert(s: &str);
@@ -23,44 +29,17 @@ pub fn greet(name: &str) {
     alert(&format!("Hello, {}!", name));
 }
 
+#[wasm_bindgen]
 pub struct SmallData {
-    pub pokemon: Vec<Pokemon>,
-    pub lookup_table: LookupTable,
+    pokemon: Vec<Pokemon>,
+    lookup_table: LookupTable,
 }
 
+#[wasm_bindgen]
 impl SmallData {
-    pub fn new() -> Self {
-        let pokemon_bin = include_bytes!("pokemon.bin");
-        let pokemon: Vec<Pokemon> =
-            bincode::decode_from_slice(pokemon_bin, bincode::config::standard())
-                .unwrap()
-                .0;
-
-        // Each Pokemon has max 10 variants in the factory
-        let lookup_table: LookupTable = create_lookup_table(&pokemon);
-
-        Self {
-            pokemon,
-            lookup_table,
-        }
-    }
-}
-
-#[wasm_bindgen]
-pub struct LargeData {
-    pub(crate) pokemon: Vec<Pokemon>,
-    pub(crate) lookup_table: LookupTable,
-    pub(crate) all_teams: [[Vec<Team>; Style::COUNT]; Type::COUNT], // All possible teams, split into buckets by type and phrase
-}
-
-#[wasm_bindgen]
-impl LargeData {
-    pub fn pokemon(&self) -> Vec<Pokemon> {
-        self.pokemon.clone()
-    }
-
     #[wasm_bindgen(constructor)]
-    pub fn generate() -> Self {
+    pub fn new() -> Self {
+        console_error_panic_hook::set_once();
         let pokemon_bin = include_bytes!("pokemon.bin");
         let pokemon: Vec<Pokemon> =
             bincode::decode_from_slice(pokemon_bin, bincode::config::standard())
@@ -70,12 +49,123 @@ impl LargeData {
         // Each Pokemon has max 10 variants in the factory
         let lookup_table: LookupTable = create_lookup_table(&pokemon);
 
-        let unique_teams: [[Vec<Team>; Style::COUNT]; Type::COUNT] = unique_teams(&lookup_table);
         Self {
             pokemon,
             lookup_table,
-            all_teams: unique_teams,
         }
+    }
+
+    /// Returns the probability of each Pokemon appearing in each slot in a team
+    pub(crate) fn compute_mon_probs(
+        &self,
+        typ: Option<Type>,
+        phrase: Option<Style>,
+        known_first_mon: Option<KnownPokemon>,
+        other_known_mons: Vec<KnownPokemon>,
+        excluded_species: Vec<Species>,
+    ) -> Vec<(PokemonRef, [f64; 3])> {
+        let teams = calculate_team_odds(
+            &self.pokemon,
+            &self.lookup_table,
+            typ,
+            phrase,
+            &known_first_mon,
+            &other_known_mons,
+            &excluded_species,
+        );
+
+        let mut p_sum = 0.0;
+        let mut p_per_pokemon: PokemonTable<[f64; 3]> = [[[0.0; 3]; 10]; Species::COUNT];
+
+        for (team, p) in teams {
+            p_sum += p as f64;
+            for (i, mon) in team.pokemon.iter().enumerate() {
+                p_per_pokemon[mon.species as usize][mon.id as usize - 1][i] += p as f64;
+            }
+        }
+
+        console::log_1(&format!("Found {} matching teams", p_sum).into());
+
+        // Avoid division by zero if we found zero matching teams
+        if p_sum == 0.0 {
+            return vec![];
+        }
+
+        // Scale all the probabilities so they sum to 1
+        p_per_pokemon
+            .iter_mut()
+            .flatten()
+            .flatten()
+            .for_each(|p| *p /= p_sum);
+
+        self.pokemon
+            .iter()
+            .filter_map(|pokemon| {
+                let probs = p_per_pokemon[pokemon.species as usize][pokemon.id as usize - 1];
+                if probs == [0.0; 3] {
+                    None
+                } else {
+                    Some((pokemon.into(), probs))
+                }
+            })
+            .collect()
+    }
+
+    pub fn compute_wasm(
+        &self,
+        typ: Option<String>,
+        phrase: Option<String>,
+        known_first_mon: Option<String>,
+        known_back_mons: Vec<String>,
+        excluded_species: Vec<String>,
+    ) -> Vec<PokemonProbability> {
+        let typ = typ.and_then(|s| Type::from_str(&s).ok());
+        let phrase = phrase.and_then(|s| Style::from_str(&s).ok());
+        let known_first_mon = known_first_mon.map(|s| KnownPokemon {
+            species: Species::from_str(&s).unwrap(),
+            moves: vec![],
+            item: None,
+        });
+        let known_back_mons: Vec<KnownPokemon> = known_back_mons
+            .into_iter()
+            .map(|s| KnownPokemon {
+                species: Species::from_str(&s).unwrap(),
+                moves: vec![],
+                item: None,
+            })
+            .collect();
+        let excluded_species: Vec<Species> = excluded_species
+            .into_iter()
+            .map(|s| Species::from_str(&s).unwrap())
+            .collect();
+
+        let result = self.compute_mon_probs(
+            typ,
+            phrase,
+            known_first_mon,
+            known_back_mons,
+            excluded_species,
+        );
+
+        for (mon, probs) in result.iter() {
+            for p in probs.iter() {
+                assert!(!p.is_nan(), "Got {:?} probs for {}", probs, mon)
+            }
+        }
+
+        let mut possible_pokemon: Vec<PokemonProbability> = result
+            .into_iter()
+            .map(|(mon, probs)| PokemonProbability {
+                pokemon: self.lookup_table[mon.species as usize][mon.id as usize - 1]
+                    .as_ref()
+                    .unwrap()
+                    .into(),
+                probability: probs.into_iter().sum::<f64>() as f32,
+            })
+            .collect();
+        possible_pokemon
+            .sort_by(|a, b| a.probability.partial_cmp(&b.probability).unwrap().reverse());
+        possible_pokemon
     }
 }
 
@@ -101,6 +191,7 @@ impl Data {
     }
     #[wasm_bindgen(constructor)]
     pub fn generate() -> Self {
+        console_error_panic_hook::set_once();
         let pokemon_bin = include_bytes!("pokemon.bin");
         let pokemon: Vec<Pokemon> =
             bincode::decode_from_slice(pokemon_bin, bincode::config::standard())
@@ -282,13 +373,50 @@ fn unique_teams(lookup_table: &LookupTable) -> [[Vec<Team>; Style::COUNT]; Type:
 pub fn calculate_team_odds(
     all_pokemon: &[Pokemon],
     lookup_table: &LookupTable,
-) -> Vec<(Team, f64)> {
-    let mut output: Vec<(Team, f64)> = Vec::new();
-    let num_possibilities = all_pokemon.len();
-    for mon in all_pokemon {
+    typ: Option<Type>,
+    phrase: Option<Style>,
+    known_first_mon: &Option<KnownPokemon>,
+    other_known_mons: &[KnownPokemon],
+    excluded_species: &[Species],
+) -> Vec<(Team, f32)> {
+    let mut output: Vec<(Team, f32)> = if known_first_mon.is_none() && other_known_mons.is_empty() {
+        Vec::with_capacity(95488944) // With no known mons, there is exactly this number of possible teams
+    } else {
+        Vec::new()
+    };
+
+    let all_possible_mons1: Vec<Pokemon> = all_pokemon
+        .iter()
+        .filter(|mon| {
+            !excluded_species.contains(&mon.species)
+                && known_first_mon
+                    .as_ref()
+                    .is_none_or(|first_mon| first_mon.species == mon.species)
+        })
+        .cloned()
+        .collect();
+
+    console::log_1(
+        &format!(
+            "Calculating team odds with known first mon {:?}, got {} possible first mons",
+            known_first_mon,
+            all_possible_mons1.len()
+        )
+        .into(),
+    );
+
+    let num_possibilities = all_possible_mons1.len();
+    for mon1 in &all_possible_mons1 {
         let all_possible_mons2 = all_pokemon
             .iter()
-            .filter(|other_mon| other_mon.species != mon.species && other_mon.item != mon.item)
+            .filter(|other_mon| {
+                !excluded_species.contains(&other_mon.species)
+                    && other_mon.species != mon1.species
+                    && other_mon.item != mon1.item
+                    && other_known_mons
+                        .get(0)
+                        .is_none_or(|known_mon| known_mon.species == other_mon.species)
+            })
             .cloned()
             .collect::<Vec<_>>();
         let num_possibilities2 = all_possible_mons2.len();
@@ -296,21 +424,28 @@ pub fn calculate_team_odds(
             let all_possible_mons3 = all_possible_mons2
                 .iter()
                 .filter(|other_mon| {
-                    other_mon.species != mon2.species && other_mon.item != mon2.item
+                    other_mon.species != mon2.species
+                        && other_mon.item != mon2.item
+                        && other_known_mons
+                            .get(1)
+                            .is_none_or(|known_mon| known_mon.species == other_mon.species)
                 })
                 .cloned()
                 .collect::<Vec<_>>();
             let num_possibilities3 = all_possible_mons3.len();
             for mon3 in all_possible_mons3.iter() {
-                let team = Team::new([mon.into(), mon2.into(), mon3.into()], lookup_table);
-                assert!(is_valid_team(team.pokemon, lookup_table));
-                output.push((
-                    team,
-                    1.0 / (num_possibilities * num_possibilities2 * num_possibilities3) as f64,
-                ));
+                let team = Team::new([mon1.into(), mon2.into(), mon3.into()], lookup_table);
+                debug_assert!(is_valid_team(team.pokemon, lookup_table));
+                if typ.is_none_or(|t| t == team.typ) && phrase.is_none_or(|ph| ph == team.phrase) {
+                    output.push((
+                        team,
+                        1.0 / (num_possibilities * num_possibilities2 * num_possibilities3) as f32,
+                    ));
+                }
             }
         }
     }
+    console::log_1(&format!("Generated {} total teams", output.len()).into());
     output
 }
 
@@ -335,6 +470,7 @@ fn unique_teams_all_permutations(
 }
 
 #[wasm_bindgen]
+#[derive(Debug, Clone)]
 pub struct KnownPokemon {
     pub species: Species,
     #[wasm_bindgen(getter_with_clone)]
