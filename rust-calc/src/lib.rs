@@ -1,6 +1,6 @@
 pub mod data;
 
-use std::{cmp::Ordering, fmt, hash, iter, mem, str::FromStr};
+use std::{cmp::Ordering, fmt, hash, iter, mem, str::FromStr, sync::LazyLock};
 
 use bincode::{Decode, Encode};
 use data::{Ability, Item, Move, Nature, Species, Type};
@@ -16,6 +16,43 @@ use wasm_bindgen::{convert::TryFromJsValue, prelude::*};
 use console_error_panic_hook;
 use std::panic;
 use web_sys::console;
+
+mod tests;
+
+struct StaticData {
+    pub pokemon: Vec<Pokemon>,
+    pub lookup_table: LookupTable,
+    pub types: [[Type; 2]; Species::COUNT], // Each species' types. For monotype species, the second type is Typeless
+}
+
+static POKEMON_DATA: LazyLock<StaticData> = LazyLock::new(|| {
+    let pokemon_bin = include_bytes!("pokemon.bin");
+    let pokemon: Vec<Pokemon> =
+        bincode::decode_from_slice(pokemon_bin, bincode::config::standard())
+            .unwrap()
+            .0;
+
+    // Each Pokemon has max 10 variants in the factory
+    let lookup_table: LookupTable = create_lookup_table(&pokemon);
+
+    let types = Species::iter()
+        .map(|species| {
+            let mon = lookup_table[species as usize][0].as_ref().unwrap();
+            [
+                mon.types[0].unwrap(),
+                mon.types[1].unwrap_or(Type::Typeless),
+            ]
+        })
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
+
+    StaticData {
+        pokemon,
+        lookup_table,
+        types,
+    }
+});
 
 fn my_init_function() {}
 
@@ -55,36 +92,86 @@ impl SmallData {
         }
     }
 
-    /// Returns the probability of each Pokemon appearing in each slot in a team
     pub(crate) fn compute_mon_probs(
         &self,
         typ: Option<Type>,
         phrase: Option<Style>,
-        known_first_mon: Option<KnownPokemon>,
-        other_known_mons: Vec<KnownPokemon>,
-        excluded_species: Vec<Species>,
+        known_first_mon: &Option<KnownPokemon>,
+        other_known_mons: &[KnownPokemon],
+        excluded_species: &[Species],
     ) -> Vec<(PokemonRef, [f64; 3])> {
-        let teams = calculate_team_odds(
-            &self.pokemon,
-            &self.lookup_table,
-            typ,
-            phrase,
-            &known_first_mon,
-            &other_known_mons,
-            &excluded_species,
-        );
-
         let mut p_sum = 0.0;
         let mut p_per_pokemon: PokemonTable<[f64; 3]> = [[[0.0; 3]; 10]; Species::COUNT];
 
-        for (team, p) in teams {
-            p_sum += p as f64;
-            for (i, mon) in team.pokemon.iter().enumerate() {
-                p_per_pokemon[mon.species as usize][mon.id as usize - 1][i] += p as f64;
+        let all_possible_mons1: Vec<Pokemon> = self
+            .pokemon
+            .iter()
+            .filter(|mon| {
+                !excluded_species.contains(&mon.species)
+                    && known_first_mon
+                        .as_ref()
+                        .is_none_or(|first_mon| first_mon.species == mon.species)
+            })
+            .cloned()
+            .collect();
+
+        // console::log_1(
+        //     &format!(
+        //         "Calculating team odds with known first mon {:?}, got {} possible first mons",
+        //         known_first_mon,
+        //         all_possible_mons1.len()
+        //     )
+        //     .into(),
+        // );
+
+        let num_possibilities = all_possible_mons1.len();
+        for mon1 in &all_possible_mons1 {
+            let all_possible_mons2 = self
+                .pokemon
+                .iter()
+                .filter(|other_mon| {
+                    !excluded_species.contains(&other_mon.species)
+                        && other_mon.species != mon1.species
+                        && other_mon.item != mon1.item
+                        && other_known_mons
+                            .first()
+                            .is_none_or(|known_mon| known_mon.species == other_mon.species)
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            let num_possibilities2 = all_possible_mons2.len();
+            for mon2 in all_possible_mons2.iter() {
+                let all_possible_mons3 = all_possible_mons2
+                    .iter()
+                    .filter(|other_mon| {
+                        other_mon.species != mon2.species
+                            && other_mon.item != mon2.item
+                            && other_known_mons
+                                .get(1)
+                                .is_none_or(|known_mon| known_mon.species == other_mon.species)
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>();
+                let num_possibilities3 = all_possible_mons3.len();
+                for mon3 in all_possible_mons3.iter() {
+                    let team =
+                        Team::new([mon1.into(), mon2.into(), mon3.into()], &self.lookup_table);
+                    debug_assert!(is_valid_team(team.pokemon, &self.lookup_table));
+                    if typ.is_none_or(|t| t == team.typ)
+                        && phrase.is_none_or(|ph| ph == team.phrase)
+                    {
+                        let p = 1.0
+                            / (num_possibilities * num_possibilities2 * num_possibilities3) as f64;
+                        p_sum += p;
+
+                        for (i, mon) in team.pokemon.iter().enumerate() {
+                            p_per_pokemon[mon.species as usize][mon.id as usize - 1][i] += p;
+                        }
+                    }
+                }
             }
         }
-
-        console::log_1(&format!("Found {} matching teams", p_sum).into());
+        // console::log_1(&format!("Generated {} total teams", output.len()).into());
 
         // Avoid division by zero if we found zero matching teams
         if p_sum == 0.0 {
@@ -142,9 +229,9 @@ impl SmallData {
         let result = self.compute_mon_probs(
             typ,
             phrase,
-            known_first_mon,
-            known_back_mons,
-            excluded_species,
+            &known_first_mon,
+            &known_back_mons,
+            &excluded_species,
         );
 
         for (mon, probs) in result.iter() {
@@ -224,11 +311,11 @@ impl Data {
             if typ.is_some_and(|t| t as usize != i) {
                 continue;
             }
-            for (j, teams) in teamss.into_iter().enumerate() {
+            for (j, teams) in teamss.iter().enumerate() {
                 if phrase.is_some_and(|p| p as usize != j) {
                     continue;
                 }
-                for team in teams.into_iter() {
+                for team in teams.iter() {
                     if excluded_species
                         .iter()
                         .all(|species| team.pokemon.iter().all(|r| r.species != *species))
@@ -368,85 +455,6 @@ fn unique_teams(lookup_table: &LookupTable) -> [[Vec<Team>; Style::COUNT]; Type:
         }
     }
     unique_teams
-}
-
-pub fn calculate_team_odds(
-    all_pokemon: &[Pokemon],
-    lookup_table: &LookupTable,
-    typ: Option<Type>,
-    phrase: Option<Style>,
-    known_first_mon: &Option<KnownPokemon>,
-    other_known_mons: &[KnownPokemon],
-    excluded_species: &[Species],
-) -> Vec<(Team, f32)> {
-    let mut output: Vec<(Team, f32)> = if known_first_mon.is_none() && other_known_mons.is_empty() {
-        Vec::with_capacity(95488944) // With no known mons, there is exactly this number of possible teams
-    } else {
-        Vec::new()
-    };
-
-    let all_possible_mons1: Vec<Pokemon> = all_pokemon
-        .iter()
-        .filter(|mon| {
-            !excluded_species.contains(&mon.species)
-                && known_first_mon
-                    .as_ref()
-                    .is_none_or(|first_mon| first_mon.species == mon.species)
-        })
-        .cloned()
-        .collect();
-
-    console::log_1(
-        &format!(
-            "Calculating team odds with known first mon {:?}, got {} possible first mons",
-            known_first_mon,
-            all_possible_mons1.len()
-        )
-        .into(),
-    );
-
-    let num_possibilities = all_possible_mons1.len();
-    for mon1 in &all_possible_mons1 {
-        let all_possible_mons2 = all_pokemon
-            .iter()
-            .filter(|other_mon| {
-                !excluded_species.contains(&other_mon.species)
-                    && other_mon.species != mon1.species
-                    && other_mon.item != mon1.item
-                    && other_known_mons
-                        .get(0)
-                        .is_none_or(|known_mon| known_mon.species == other_mon.species)
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-        let num_possibilities2 = all_possible_mons2.len();
-        for mon2 in all_possible_mons2.iter() {
-            let all_possible_mons3 = all_possible_mons2
-                .iter()
-                .filter(|other_mon| {
-                    other_mon.species != mon2.species
-                        && other_mon.item != mon2.item
-                        && other_known_mons
-                            .get(1)
-                            .is_none_or(|known_mon| known_mon.species == other_mon.species)
-                })
-                .cloned()
-                .collect::<Vec<_>>();
-            let num_possibilities3 = all_possible_mons3.len();
-            for mon3 in all_possible_mons3.iter() {
-                let team = Team::new([mon1.into(), mon2.into(), mon3.into()], lookup_table);
-                debug_assert!(is_valid_team(team.pokemon, lookup_table));
-                if typ.is_none_or(|t| t == team.typ) && phrase.is_none_or(|ph| ph == team.phrase) {
-                    output.push((
-                        team,
-                        1.0 / (num_possibilities * num_possibilities2 * num_possibilities3) as f32,
-                    ));
-                }
-            }
-        }
-    }
-    console::log_1(&format!("Generated {} total teams", output.len()).into());
-    output
 }
 
 fn unique_teams_all_permutations(
@@ -673,6 +681,8 @@ pub struct Team {
 }
 
 impl Team {
+    // Never inline, for profiling purposes
+    #[inline(never)]
     fn new(pokemon: [PokemonRef; 3], lookup_table: &LookupTable) -> Self {
         Self {
             pokemon,
@@ -682,6 +692,8 @@ impl Team {
     }
 }
 
+// Never inline, for profiling purposes
+#[inline(never)]
 fn is_valid_team(pokemon: [PokemonRef; 3], lookup_table: &LookupTable) -> bool {
     pokemon[0].species != pokemon[1].species
         && pokemon[0].species != pokemon[2].species
@@ -714,21 +726,19 @@ fn is_valid_team(pokemon: [PokemonRef; 3], lookup_table: &LookupTable) -> bool {
 
 fn type_hint(pokemon: [PokemonRef; 3], lookup_table: &LookupTable) -> Type {
     let mut type_map: [u8; Type::COUNT] = [0; Type::COUNT];
-    for typ in pokemon.into_iter().flat_map(|p| {
-        lookup_table[p.species as usize][p.id as usize - 1]
-            .as_ref()
-            .unwrap()
-            .types
-            .into_iter()
-            .flatten()
-    }) {
-        type_map[typ as usize] += 1;
+    for [type1, type2] in pokemon
+        .into_iter()
+        .map(|p| POKEMON_DATA.types[p.species as usize])
+    {
+        type_map[type1 as usize] += 1;
+        type_map[type2 as usize] += 1;
     }
 
     let mut highest_type_id = None;
     let mut highest_type_count = 0;
 
-    for (type_id, count) in type_map.into_iter().enumerate() {
+    // Skip the last type, which is Typeless
+    for (type_id, count) in type_map.into_iter().enumerate().take(Type::COUNT - 1) {
         match count.cmp(&highest_type_count) {
             Ordering::Greater => {
                 highest_type_id = Some(type_id);
