@@ -1,11 +1,11 @@
 use crate::{
     data::{Species, Type},
-    KnownPokemon, PokemonRef, SmallData, Style,
+    KnownPokemon, PokemonData, PokemonRef, Style,
 };
 
 #[test]
 pub fn calculator_no_info_test() {
-    let small_data = SmallData::new();
+    let small_data = PokemonData::new();
     let mut result = small_data.compute_mon_probs(None, None, &None, &[], &[]);
 
     result.sort_by(|(_, probs1), (_, probs2)| {
@@ -38,7 +38,7 @@ pub fn calculator_no_info_test() {
 
 #[test]
 pub fn calculator_test1() {
-    let small_data = SmallData::new();
+    let small_data = PokemonData::new();
     let mut result = small_data.compute_mon_probs(
         Some(Type::Bug),
         Some(Style::FreeSpirited),

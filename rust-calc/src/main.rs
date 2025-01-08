@@ -1,5 +1,5 @@
 use bincode::{self};
-use rust_calc::SmallData;
+use rust_calc::PokemonData;
 // use rust_calc::{
 //     calculate_team_odds,
 //     data::{Item, Species},
@@ -15,7 +15,7 @@ use std::{
 fn main() {
     // print_encoded_pokemon();
 
-    let small_data = SmallData::new();
+    let small_data = PokemonData::new();
     let result = small_data.compute_mon_probs(None, None, &None, &[], &[]);
     println!("{:?}", result[0])
 
