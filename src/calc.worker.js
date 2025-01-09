@@ -14,10 +14,10 @@ init().then(() => {
 
     self.onmessage = function (e) {
         const payload = JSON.parse(e.data)
-        console.log(`Computing with "${payload.type}", "${payload.phrase}" included species ${payload.includedSpecies} and excluded species "${payload.excludedSpecies}" from "${payload}`)
+        console.log(`Computing with "${payload.type}", "${payload.phrase}", highAccuracy=${payload.useHighAccuracy}, included species ${payload.includedSpecies} and excluded species "${payload.excludedSpecies}" from "${payload}`)
         const startTime = performance.now()
         let probabilities;
-        if (!payload.highAccuracy) {
+        if (payload.useHighAccuracy) {
             const firstMon = payload.includedSpecies[0];
             const backMons = payload.includedSpecies.slice(1);
             probabilities = pokemonData.compute_wasm(payload.type, payload.phrase, firstMon, backMons, payload.excludedSpecies);

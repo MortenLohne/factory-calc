@@ -45,6 +45,7 @@ const phraseLabels = {
 const Calculator = () => {
   const [type, setType] = useState("Typeless");
   const [phrase, setPhrase] = useState("FreeSpirited");
+  const [useHighAccuracy, setUseHighAccuracy] = useState(false);
   const [includedSpecies, setIncludedSpecies] = useState([]); // Species on the opponent's team
   const [excludedSpecies, setExcludedSpecies] = useState([]); // Species on our team or in last round's pool
   const [result, setResult] = useState(null);
@@ -59,8 +60,8 @@ const Calculator = () => {
   };
 
   useEffect(() => {
-    worker.postMessage(JSON.stringify({ type: type, phrase: phrase, includedSpecies, excludedSpecies: excludedSpecies }));
-  }, [type, phrase, includedSpecies, excludedSpecies, worker]);
+    worker.postMessage(JSON.stringify({ type: type, phrase: phrase, useHighAccuracy, includedSpecies, excludedSpecies: excludedSpecies }));
+  }, [type, phrase, useHighAccuracy, includedSpecies, excludedSpecies, worker]);
 
   worker.onmessage = (e) => {
     setResult(JSON.parse(e.data));
@@ -85,7 +86,14 @@ const Calculator = () => {
           {types.map(type =>
             <option key={type} value={type}>{type}</option>
           )}
+
         </select>
+        <label>
+          <input
+            type="checkbox"
+            checked={useHighAccuracy}
+            onChange={() => setUseHighAccuracy(!useHighAccuracy)}
+          />Use high accuracy calculation</label>
         <select value={phrase} onChange={handlePhraseChange} style={{ fontSize: '1.3em' }}>
           <option value="">Unknown phrase</option>
           {phrases.map(phrase =>
