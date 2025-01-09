@@ -1,138 +1,44 @@
 import React, { useState } from 'react';
+import MoveSelection from './MoveSelection';
 
-const speciesList = [
-    "Aerodactyl",
-    "Aggron",
-    "Alakazam",
-    "Altaria",
-    "Ampharos",
-    "Arcanine",
-    "Armaldo",
-    "Articuno",
-    "Blastoise",
-    "Blaziken",
-    "Blissey",
-    "Breloom",
-    "Charizard",
-    "Claydol",
-    "Clefable",
-    "Cradily",
-    "Crobat",
-    "Dewgong",
-    "Dodrio",
-    "Donphan",
-    "Dragonite",
-    "Dugtrio",
-    "Dusclops",
-    "Electabuzz",
-    "Electrode",
-    "Entei",
-    "Espeon",
-    "Exeggutor",
-    "Exploud",
-    "Fearow",
-    "Feraligatr",
-    "Flareon",
-    "Flygon",
-    "Forretress",
-    "Gardevoir",
-    "Gengar",
-    "Glalie",
-    "Golduck",
-    "Golem",
-    "Granbull",
-    "Gyarados",
-    "Hariyama",
-    "Heracross",
-    "Houndoom",
-    "Hypno",
-    "Jolteon",
-    "Jynx",
-    "Kangaskhan",
-    "Kingdra",
-    "Lanturn",
-    "Lapras",
-    "Latias",
-    "Latios",
-    "Ludicolo",
-    "Machamp",
-    "Magmar",
-    "Manectric",
-    "Marowak",
-    "Medicham",
-    "Meganium",
-    "Metagross",
-    "Milotic",
-    "Miltank",
-    "Misdreavus",
-    "Moltres",
-    "MrMime",
-    "Muk",
-    "Nidoking",
-    "Nidoqueen",
-    "Ninetales",
-    "Porygon2",
-    "Quagsire",
-    "Raichu",
-    "Raikou",
-    "Rapidash",
-    "Regice",
-    "Regirock",
-    "Registeel",
-    "Rhydon",
-    "Salamence",
-    "Sceptile",
-    "Scizor",
-    "Shiftry",
-    "Shuckle",
-    "Skarmory",
-    "Slaking",
-    "Slowbro",
-    "Slowking",
-    "Snorlax",
-    "Starmie",
-    "Steelix",
-    "Suicune",
-    "Swampert",
-    "Tauros",
-    "Tentacruel",
-    "Typhlosion",
-    "Tyranitar",
-    "Umbreon",
-    "Ursaring",
-    "Vaporeon",
-    "Venusaur",
-    "Victreebel",
-    "Vileplume",
-    "Wailord",
-    "Walrein",
-    "Weezing",
-    "Whiscash",
-    "Xatu",
-    "Zapdos",
-];
+const OpponentSelector = ({ pokemonData, setIncludedMons }) => {
+    console.log(`Rendering opponent selector with ${pokemonData.length} pokemmon`);
+    console.log(`First moveset ${pokemonData[0]?.moves}`);
 
-const OpponentSelector = ({ setIncludedSpecies }) => {
+    // An object with all species as keys, mapped to their movesets
+    const allSpecies = pokemonData.reduce((acc, { species, moves }) => {
+        if (acc[species]) {
+            acc[species].movesets.push(moves);
+        } else {
+            acc[species] = { movesets: [moves] };
+        }
+        return acc;
+    }, {});
+
     const [opponents, setOpponents] = useState([
-        { species: '', moveset: [] },
-        { species: '', moveset: [] },
-        { species: '', moveset: [] },
+        { species: '', possibleMonIds: [] },
+        { species: '', possibleMonIds: [] },
+        { species: '', possibleMonIds: [] },
     ]);
 
     const handleSpeciesChange = (index, event) => {
         const newOpponents = [...opponents];
-        newOpponents[index] = { species: event.target.value, moveset: opponents[index].moveset };
+        newOpponents[index] = { species: event.target.value, possibleMonIds: opponents[index].possibleMonIds };
         setOpponents(newOpponents);
-        setIncludedSpecies(newOpponents.map(opponent => opponent.species).filter(species => species));
+        setIncludedMons(newOpponents);
     };
 
 
-    const handleMovesetChange = (index, event) => {
+    const updateMovesets = (index, movesets) => {
         const newOpponents = [...opponents];
-        const moveset = Array.from(event.target.selectedOptions, option => option.value);
-        newOpponents[index].moveset = moveset;
+        const moveset = movesets;
+        newOpponents[index].possibleMonIds = moveset;
         setOpponents(newOpponents);
+        setIncludedMons(newOpponents);
     };
+
+    const firstSpecies = Object.keys(allSpecies)[0];
+    console.log(`First species ${firstSpecies} has ${allSpecies[firstSpecies]?.movesets?.length} movesets: ${allSpecies[firstSpecies]?.movesets}`);
 
     return (
         <div style={{ display: 'flex', justifyContent: 'space-around' }}>
@@ -145,31 +51,17 @@ const OpponentSelector = ({ setIncludedSpecies }) => {
                         onChange={(e) => handleSpeciesChange(index, e)}
                     >
                         <option value="">Select species</option>
-                        {speciesList.map((species) => (
+                        {Object.keys(allSpecies).map((species) => (
                             <option key={species} value={species}>
                                 {species}
                             </option>
                         ))}
                     </select>
-                    {/* <div>
-                        <label>
-                            Moveset:
-                            <select
-                                multiple
-                                value={opponent.moveset}
-                                onChange={(event) => handleMovesetChange(index, event)}
-                            >
-                                {[...Array(10).keys()].map(num => (
-                                    <option key={num + 1} value={num + 1}>
-                                        {num + 1}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                    </div> */}
+                    <MoveSelection setMovesetsSelected={(newMovesets) => updateMovesets(index, newMovesets)} movesets={opponents[index].possibleMonIds}></MoveSelection>
                 </div>
-            ))}
-        </div>
+            ))
+            }
+        </div >
     );
 };
 

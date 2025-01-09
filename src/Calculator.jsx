@@ -46,10 +46,14 @@ const Calculator = () => {
   const [type, setType] = useState("Typeless");
   const [phrase, setPhrase] = useState("FreeSpirited");
   const [useHighAccuracy, setUseHighAccuracy] = useState(false);
-  const [includedSpecies, setIncludedSpecies] = useState([]); // Species on the opponent's team
+  const [includedMons, setIncludedMons] = useState([]); // Species on the opponent's team
+  const [opponentMovesets, setOpponentMovesets] = useState([]);
   const [excludedSpecies, setExcludedSpecies] = useState([]); // Species on our team or in last round's pool
   const [result, setResult] = useState(null);
   const [worker] = useState(() => new Worker());
+
+  // Pokemon data (Names, movesets, etc) is sent from the wasm worker, since it's stored in the wasm binary anyway
+  const [pokemonData, setPokemonData] = useState([]);
 
   const handleTypeChange = (e) => {
     setType(e.target.value);
@@ -60,11 +64,18 @@ const Calculator = () => {
   };
 
   useEffect(() => {
-    worker.postMessage(JSON.stringify({ type: type, phrase: phrase, useHighAccuracy, includedSpecies, excludedSpecies: excludedSpecies }));
-  }, [type, phrase, useHighAccuracy, includedSpecies, excludedSpecies, worker]);
+    worker.postMessage(JSON.stringify({ type: type, phrase: phrase, useHighAccuracy, includedMons, excludedSpecies: excludedSpecies }));
+  }, [type, phrase, useHighAccuracy, includedMons, excludedSpecies, worker]);
 
   worker.onmessage = (e) => {
-    setResult(JSON.parse(e.data));
+    const data = JSON.parse(e.data);
+    if (data.pokemonProbabilities) {
+      setResult(data.pokemonProbabilities);
+    } else if (data.pokemonData) {
+      setPokemonData(data.pokemonData);
+    } else {
+      console.error("Unknown message from worker", data);
+    }
   };
 
   const probabilityPerSpecies = (result || []).reduce((acc, { pokemon, probability }) => {
@@ -109,7 +120,7 @@ const Calculator = () => {
       </div>
       <h2 style={{ marginBottom: 0, marginTop: 50 }}> Opponent's pokémon: </h2>
       <div>
-        <OpponentSelector setIncludedSpecies={setIncludedSpecies} />
+        <OpponentSelector pokemonData={pokemonData} setIncludedMons={setIncludedMons} />
       </div>
       {result === null ? <p>Loading Pokemon data...</p> : result.length === 0 ? <p>No matching Pokemon found!</p> :
         <div className="table-container">

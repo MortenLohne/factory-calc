@@ -131,6 +131,11 @@ impl PokemonData {
             .sort_by(|a, b| a.probability.partial_cmp(&b.probability).unwrap().reverse());
         possible_pokemon
     }
+
+    #[wasm_bindgen(js_name = allPokemon)]
+    pub fn all_pokemon(&self) -> Vec<JSPokemon> {
+        self.pokemon.iter().map(|p| p.into()).collect()
+    }
 }
 
 impl PokemonData {
