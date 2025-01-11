@@ -4,6 +4,7 @@ import './Calculator.css'; // Assuming you have a CSS file for styles
 import Worker from './calc.worker.js';
 import ExcludedSpeciesSelector from './ExcludedSpeciesSelector';
 import OpponentSelector from './OpponentSelector';
+import SingleOpponentSelector from './SingleOpponentSelector';
 
 const types = [
   'Bug', 'Dark',
@@ -46,7 +47,6 @@ const Calculator = () => {
   const [type, setType] = useState("Typeless");
   const [phrase, setPhrase] = useState("FreeSpirited");
   const [useHighAccuracy, setUseHighAccuracy] = useState(false);
-  const [includedMons, setIncludedMons] = useState([]); // Species on the opponent's team
   const [opponentMovesets, setOpponentMovesets] = useState([]);
   const [excludedSpecies, setExcludedSpecies] = useState([]); // Species on our team or in last round's pool
   const [result, setResult] = useState(null);
@@ -64,8 +64,8 @@ const Calculator = () => {
   };
 
   useEffect(() => {
-    worker.postMessage(JSON.stringify({ type: type, phrase: phrase, useHighAccuracy, includedMons, excludedSpecies: excludedSpecies }));
-  }, [type, phrase, useHighAccuracy, includedMons, excludedSpecies, worker]);
+    worker.postMessage(JSON.stringify({ type: type, phrase: phrase, useHighAccuracy, opponentMovesets, excludedSpecies: excludedSpecies }));
+  }, [type, phrase, useHighAccuracy, opponentMovesets, excludedSpecies, worker]);
 
   worker.onmessage = (e) => {
     const data = JSON.parse(e.data);
@@ -119,8 +119,21 @@ const Calculator = () => {
 
       </div>
       <h2 style={{ marginBottom: 0, marginTop: 50 }}> Opponent's pokémon: </h2>
-      <div>
-        <OpponentSelector pokemonData={pokemonData} setIncludedMons={setIncludedMons} />
+      <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+        {[1, 2, 3].map((index) => (
+          <div key={index}>
+            <h4>Opponent {index + 1}</h4>
+            <SingleOpponentSelector setOpponent={(mons) => {
+              console.log(`Selected ${mons.map(mon => `${mon.species}-${mon.id}`)}`);
+              setOpponentMovesets((oldMons) => {
+                const newMons = [...oldMons];
+                newMons[index - 1] = mons;
+                return newMons;
+              });
+            }} pokemonData={pokemonData} />
+          </div>
+        ))
+        }
       </div>
       {result === null ? <p>Loading Pokemon data...</p> : result.length === 0 ? <p>No matching Pokemon found!</p> :
         <div className="table-container">

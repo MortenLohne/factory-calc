@@ -44,8 +44,7 @@ pub fn calculator_test1() {
         Some(Style::FreeSpirited),
         &Some(KnownPokemon {
             species: Species::Heracross,
-            moves: vec![],
-            item: None,
+            possible_sets: vec![1, 2, 3, 4],
         }),
         &[],
         &vec![Species::Scizor],
@@ -69,7 +68,11 @@ pub fn calculator_test1() {
         "Expected Heracross-3, got {:?}",
         result[0].0
     );
-    assert!((result[0].1.into_iter().sum::<f64>() - 0.3829).abs() < 0.0001);
+    assert!(
+        (result[0].1.into_iter().sum::<f64>() - 0.3829).abs() < 0.0001,
+        "Expected Heracross-3 to be 38.29% likely, got {:.1}%",
+        result[0].1.into_iter().sum::<f64>() * 100.0
+    );
 
     assert!(
         result[4].0

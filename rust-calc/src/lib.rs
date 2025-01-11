@@ -1,6 +1,11 @@
 pub mod data;
 
-use std::{cmp::Ordering, fmt, hash, iter, mem, str::FromStr};
+use std::{
+    cmp::Ordering,
+    fmt::{self, Display},
+    hash, iter, mem,
+    str::FromStr,
+};
 
 use bincode::{Decode, Encode};
 use data::{Ability, Item, Move, Nature, Species, Type};
@@ -79,25 +84,12 @@ impl PokemonData {
         &self,
         typ: Option<String>,
         phrase: Option<String>,
-        known_first_mon: Option<String>,
-        known_back_mons: Vec<String>,
+        known_first_mon: Option<KnownPokemon>,
+        known_back_mons: Vec<KnownPokemon>,
         excluded_species: Vec<String>,
     ) -> Vec<PokemonProbability> {
         let typ = typ.and_then(|s| Type::from_str(&s).ok());
         let phrase = phrase.and_then(|s| Style::from_str(&s).ok());
-        let known_first_mon = known_first_mon.map(|s| KnownPokemon {
-            species: Species::from_str(&s).unwrap(),
-            moves: vec![],
-            item: None,
-        });
-        let known_back_mons: Vec<KnownPokemon> = known_back_mons
-            .into_iter()
-            .map(|s| KnownPokemon {
-                species: Species::from_str(&s).unwrap(),
-                moves: vec![],
-                item: None,
-            })
-            .collect();
         let excluded_species: Vec<Species> = excluded_species
             .into_iter()
             .map(|s| Species::from_str(&s).unwrap())
@@ -220,9 +212,10 @@ impl PokemonData {
             .iter()
             .filter(|mon| {
                 !excluded_species.contains(&mon.species)
-                    && known_first_mon
-                        .as_ref()
-                        .is_none_or(|first_mon| first_mon.species == mon.species)
+                    && known_first_mon.as_ref().is_none_or(|first_mon| {
+                        first_mon.species == mon.species
+                            && first_mon.possible_sets.contains(&mon.id)
+                    })
             })
             .cloned()
             .collect();
@@ -236,22 +229,28 @@ impl PokemonData {
                     !excluded_species.contains(&other_mon.species)
                         && other_mon.species != mon1.species
                         && other_mon.item != mon1.item
-                        && other_known_mons
-                            .first()
-                            .is_none_or(|known_mon| known_mon.species == other_mon.species)
+                        && other_known_mons.first().is_none_or(|known_mon| {
+                            known_mon.species == other_mon.species
+                                && known_mon.possible_sets.contains(&other_mon.id)
+                        })
                 })
                 .cloned()
                 .collect::<Vec<_>>();
             let num_possibilities2 = all_possible_mons2.len();
             for mon2 in all_possible_mons2.iter() {
-                let all_possible_mons3 = all_possible_mons2
+                let all_possible_mons3 = self
+                    .pokemon
                     .iter()
                     .filter(|other_mon| {
-                        other_mon.species != mon2.species
+                        !excluded_species.contains(&other_mon.species)
+                            && other_mon.species != mon1.species
+                            && other_mon.item != mon1.item
+                            && other_mon.species != mon2.species
                             && other_mon.item != mon2.item
-                            && other_known_mons
-                                .get(1)
-                                .is_none_or(|known_mon| known_mon.species == other_mon.species)
+                            && other_known_mons.get(1).is_none_or(|known_mon| {
+                                known_mon.species == other_mon.species
+                                    && known_mon.possible_sets.contains(&other_mon.id)
+                            })
                     })
                     .cloned()
                     .collect::<Vec<_>>();
@@ -386,17 +385,15 @@ impl Data {
                         && known_mons.iter().all(
                             |KnownPokemon {
                                  species,
-                                 moves,
-                                 item,
+                                 possible_sets,
                              }| {
                                 team.pokemon.iter().any(|r| {
                                     let team_mon = self.small_data.lookup_table[r.species as usize]
                                         [r.id as usize - 1]
                                         .as_ref()
                                         .unwrap();
-                                    (item.is_none() || Some(team_mon.item) == *item)
+                                    possible_sets.contains(&team_mon.id)
                                         && team_mon.species == *species
-                                        && moves.iter().all(|mv| team_mon.moves.contains(mv))
                                 })
                             },
                         )
@@ -444,7 +441,7 @@ impl Data {
         &self,
         typ: Option<String>,
         phrase: Option<String>,
-        known_species: Vec<String>,
+        known_pokemon: Vec<KnownPokemon>,
         excluded_species: Vec<String>,
     ) -> Vec<PokemonProbability> {
         let typ = typ.and_then(|s| Type::from_str(&s).ok());
@@ -452,14 +449,7 @@ impl Data {
         self.compute_mon_probs(
             typ,
             phrase,
-            known_species
-                .into_iter()
-                .map(|s| KnownPokemon {
-                    species: Species::from_str(&s).unwrap(),
-                    moves: vec![],
-                    item: None,
-                })
-                .collect(),
+            known_pokemon,
             excluded_species
                 .into_iter()
                 .map(|s| Species::from_str(&s).unwrap())
@@ -499,9 +489,36 @@ pub fn compute_species_probs(mon_probs: &[(PokemonRef, f32)]) -> Vec<(Species, f
 #[derive(Debug, Clone)]
 pub struct KnownPokemon {
     pub species: Species,
-    #[wasm_bindgen(getter_with_clone)]
-    pub moves: Vec<Move>,
-    pub item: Option<Item>,
+    #[wasm_bindgen(getter_with_clone, js_name = possibleSets)]
+    pub possible_sets: Vec<u8>,
+}
+
+#[wasm_bindgen]
+impl KnownPokemon {
+    #[wasm_bindgen(constructor)]
+    pub fn new_from_js(species: String, possible_sets: Vec<u8>) -> Self {
+        Self {
+            species: species.parse().unwrap(),
+            possible_sets,
+        }
+    }
+
+    #[allow(non_snake_case)]
+    pub fn toString(&self) -> String {
+        self.to_string()
+    }
+}
+
+impl Display for KnownPokemon {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let sets_string = self
+            .possible_sets
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+            .join("/");
+        write!(f, "{}-{}", self.species, sets_string)
+    }
 }
 
 #[wasm_bindgen(inspectable)]
