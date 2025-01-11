@@ -58,10 +58,10 @@ pub fn fast_known_tyranitar_test() {
     let result = data.compute_mon_probs(
         Some(Type::Typeless),
         Some(Style::FreeSpirited),
-        vec![KnownPokemon {
-            species: Species::Tyranitar,
-            possible_sets: vec![2, 4, 6, 8, 10],
-        }],
+        vec![KnownPokemon::new_from_js(
+            Species::Tyranitar.to_string(),
+            vec![2, 4, 6, 8, 10],
+        )],
         vec![],
     );
 
@@ -99,10 +99,10 @@ pub fn calculator_test1() {
     let mut result = small_data.compute_mon_probs(
         Some(Type::Bug),
         Some(Style::FreeSpirited),
-        &Some(KnownPokemon {
-            species: Species::Heracross,
-            possible_sets: vec![1, 2, 3, 4],
-        }),
+        &Some(KnownPokemon::new_from_js(
+            Species::Heracross.to_string(),
+            vec![1, 2, 3, 4],
+        )),
         &[],
         &vec![Species::Scizor],
     );

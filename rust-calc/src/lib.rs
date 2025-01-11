@@ -213,8 +213,7 @@ impl PokemonData {
             .filter(|mon| {
                 !excluded_species.contains(&mon.species)
                     && known_first_mon.as_ref().is_none_or(|first_mon| {
-                        first_mon.species == mon.species
-                            && first_mon.possible_sets.contains(&mon.id)
+                        first_mon.species == mon.species && first_mon.contains_set(mon.id)
                     })
             })
             .cloned()
@@ -231,7 +230,7 @@ impl PokemonData {
                         && other_mon.item != mon1.item
                         && other_known_mons.first().is_none_or(|known_mon| {
                             known_mon.species == other_mon.species
-                                && known_mon.possible_sets.contains(&other_mon.id)
+                                && known_mon.contains_set(other_mon.id)
                         })
                 })
                 .cloned()
@@ -249,7 +248,7 @@ impl PokemonData {
                             && other_mon.item != mon2.item
                             && other_known_mons.get(1).is_none_or(|known_mon| {
                                 known_mon.species == other_mon.species
-                                    && known_mon.possible_sets.contains(&other_mon.id)
+                                    && known_mon.contains_set(other_mon.id)
                             })
                     })
                     .cloned()
@@ -382,21 +381,12 @@ impl Data {
                     if excluded_species
                         .iter()
                         .all(|species| team.pokemon.iter().all(|r| r.species != *species))
-                        && known_mons.iter().all(
-                            |KnownPokemon {
-                                 species,
-                                 possible_sets,
-                             }| {
-                                team.pokemon.iter().any(|r| {
-                                    let team_mon = self.small_data.lookup_table[r.species as usize]
-                                        [r.id as usize - 1]
-                                        .as_ref()
-                                        .unwrap();
-                                    possible_sets.contains(&team_mon.id)
-                                        && team_mon.species == *species
-                                })
-                            },
-                        )
+                        && known_mons.iter().all(|known_mon| {
+                            team.pokemon.iter().any(|team_mon| {
+                                known_mon.species == team_mon.species
+                                    && known_mon.contains_set(team_mon.id)
+                            })
+                        })
                     {
                         matching_teams += 1;
                         for pokemon in team.pokemon.iter() {
@@ -489,17 +479,21 @@ pub fn compute_species_probs(mon_probs: &[(PokemonRef, f32)]) -> Vec<(Species, f
 #[derive(Debug, Clone)]
 pub struct KnownPokemon {
     pub species: Species,
-    #[wasm_bindgen(getter_with_clone, js_name = possibleSets)]
-    pub possible_sets: Vec<u8>,
+    possible_sets_bitset: u16,
 }
 
 #[wasm_bindgen]
 impl KnownPokemon {
     #[wasm_bindgen(constructor)]
     pub fn new_from_js(species: String, possible_sets: Vec<u8>) -> Self {
+        let mut possible_sets_bitset: u16 = 0;
+        for n in possible_sets {
+            assert_ne!(n, 0);
+            possible_sets_bitset |= 1 << n;
+        }
         Self {
             species: species.parse().unwrap(),
-            possible_sets,
+            possible_sets_bitset,
         }
     }
 
@@ -507,12 +501,18 @@ impl KnownPokemon {
     pub fn toString(&self) -> String {
         self.to_string()
     }
+
+    pub fn contains_set(&self, set: u8) -> bool {
+        self.possible_sets_bitset & (1 << set) != 0
+    }
 }
 
 impl Display for KnownPokemon {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let sets_string = self
-            .possible_sets
+        let possible_sets = (1..=10)
+            .filter(|n| self.contains_set(*n))
+            .collect::<Vec<_>>();
+        let sets_string = possible_sets
             .iter()
             .map(|s| s.to_string())
             .collect::<Vec<_>>()
