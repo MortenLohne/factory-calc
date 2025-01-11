@@ -1,6 +1,6 @@
 use crate::{
     data::{Species, Type},
-    KnownPokemon, PokemonData, PokemonRef, Style,
+    Data, KnownPokemon, PokemonData, PokemonRef, Style,
 };
 
 #[test]
@@ -34,6 +34,63 @@ pub fn calculator_no_info_test() {
         result[0].0
     );
     assert!((result[4].1.into_iter().sum::<f64>() - 0.006564).abs() < 0.000001);
+}
+
+#[test]
+pub fn fast_no_info_test() {
+    let data = Data::generate();
+    let result = data.compute_mon_probs(None, None, vec![], vec![]);
+    assert!(
+        result[0].0
+            == PokemonRef {
+                species: Species::Muk,
+                id: 1
+            },
+        "Expected Muk-1, got {:?}",
+        result[0].0
+    );
+    assert!((result[0].1 - 0.0072206).abs() < 0.000001);
+}
+
+#[test]
+pub fn fast_known_tyranitar_test() {
+    let data = Data::generate();
+    let result = data.compute_mon_probs(
+        Some(Type::Typeless),
+        Some(Style::FreeSpirited),
+        vec![KnownPokemon {
+            species: Species::Tyranitar,
+            possible_sets: vec![2, 4, 6, 8, 10],
+        }],
+        vec![],
+    );
+
+    assert_eq!(
+        result[0].0,
+        PokemonRef {
+            species: Species::Tyranitar,
+            id: 4
+        },
+    );
+    assert!((result[0].1 - 0.2686894).abs() < 0.000001);
+
+    assert_eq!(
+        result[1].0,
+        PokemonRef {
+            species: Species::Tyranitar,
+            id: 2
+        },
+    );
+    assert!((result[1].1 - 0.2473381).abs() < 0.000001);
+
+    assert_eq!(
+        result[7].0,
+        PokemonRef {
+            species: Species::Arcanine,
+            id: 1
+        },
+    );
+    assert!((result[7].1 - 0.0089900).abs() < 0.000001);
 }
 
 #[test]
