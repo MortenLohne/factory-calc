@@ -13,10 +13,19 @@ init().then(() => {
     const defaultResult = data.compute("Typeless", "FreeSpirited", [], []);
     postMessage(JSON.stringify({ pokemonProbabilities: defaultResult }))
 
+    let memoizedResults = {};
+
     self.onmessage = function (e) {
         const payload = JSON.parse(e.data)
-        // console.log(`Computing with "${payload.type}", "${payload.phrase}", highAccuracy=${payload.useHighAccuracy}, included mons ${JSON.stringify(payload.includedMons)} and excluded species "${payload.excludedSpecies}" from "${payload}`)
         const startTime = performance.now()
+        // console.log(`Computing with "${payload.type}", "${payload.phrase}", highAccuracy=${payload.useHighAccuracy}, included mons ${JSON.stringify(payload.includedMons)} and excluded species "${payload.excludedSpecies}" from "${payload}`)
+        if (memoizedResults[e.data]) {
+            console.log("Using memoized calculation result")
+            postMessage(JSON.stringify(
+                { pokemonProbabilities: memoizedResults[e.data] }
+            ))
+            return;
+        }
         let probabilities;
 
         const knownPokemon = payload.opponentMovesets.filter(mons => mons.length > 0).map((mons) => new KnownPokemon(mons[0].species, mons.map((mon) => mon.id)));
@@ -30,6 +39,7 @@ init().then(() => {
         }
         const endTime = performance.now()
         console.log(`Computed probabilities in ${endTime - startTime} milliseconds`)
+        memoizedResults[e.data] = probabilities;
         postMessage(JSON.stringify(
             { pokemonProbabilities: probabilities }))
     };
