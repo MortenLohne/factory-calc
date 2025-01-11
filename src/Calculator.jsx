@@ -123,7 +123,6 @@ const Calculator = () => {
           <div key={index}>
             <h4>Opponent {index}</h4>
             <SingleOpponentSelector setOpponent={(mons) => {
-              console.log(`Selected ${mons.map(mon => `${mon.species}-${mon.id}`)}`);
               setOpponentMovesets((oldMons) => {
                 const newMons = [...oldMons];
                 newMons[index - 1] = mons;
