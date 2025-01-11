@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import './Calculator.css'; // Assuming you have a CSS file for styles
 import Worker from './calc.worker.js';
 import ExcludedSpeciesSelector from './ExcludedSpeciesSelector';
-import OpponentSelector from './OpponentSelector';
 import SingleOpponentSelector from './SingleOpponentSelector';
 
 const types = [
