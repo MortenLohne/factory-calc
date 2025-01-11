@@ -151,7 +151,7 @@ const Calculator = () => {
                 .map(([species, probability]) =>
                   <tr key={species}>
                     <th scope="row">{species}</th>
-                    <td>{(probability * 100).toFixed(5) + "%"}</td>
+                    <td>{(probability * 100).toFixed(2) + "%"}</td>
                   </tr>
                 )}
             </tbody>
@@ -172,7 +172,7 @@ const Calculator = () => {
                 .map(res =>
                   <tr key={res.pokemon.species + "-" + res.pokemon.id}>
                     <th scope="row">{res.pokemon.species + "-" + res.pokemon.id}</th>
-                    <td>{(res.probability * 100).toFixed(5) + "%"}</td>
+                    <td>{(res.probability * 100).toFixed(2) + "%"}</td>
                   </tr>
                 )}
             </tbody>
